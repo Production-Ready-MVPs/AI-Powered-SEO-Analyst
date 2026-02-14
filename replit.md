@@ -19,7 +19,8 @@ DevSEO AI is a SaaS platform that provides AI-powered SEO audits. Users can subm
 - `server/` - Express backend
   - `routes.ts` - API endpoints
   - `storage.ts` - Database operations (IStorage / DatabaseStorage)
-  - `seo-analyzer.ts` - OpenAI-powered SEO analysis
+  - `seo-analyzer.ts` - OpenAI-powered SEO analysis (uses crawler + AI)
+  - `lib/crawler.ts` - Playwright crawler service (max 20 pages, robots.txt, retry logic)
   - `db.ts` - Drizzle + pg pool
   - `replit_integrations/auth/` - Replit Auth module
 - `shared/` - Shared types
