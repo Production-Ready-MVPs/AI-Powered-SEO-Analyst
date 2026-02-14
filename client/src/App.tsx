@@ -16,6 +16,7 @@ import NewAuditPage from "@/pages/new-audit";
 import AuditDetailPage from "@/pages/audit-detail";
 import AuditsListPage from "@/pages/audits-list";
 import SettingsPage from "@/pages/settings";
+import AdminPage from "@/pages/admin";
 
 function AuthenticatedRoutes() {
   const sidebarStyle = {
@@ -39,6 +40,7 @@ function AuthenticatedRoutes() {
               <Route path="/audits/:id" component={AuditDetailPage} />
               <Route path="/audits" component={AuditsListPage} />
               <Route path="/settings" component={SettingsPage} />
+              <Route path="/admin" component={AdminPage} />
               <Route component={NotFound} />
             </Switch>
           </main>

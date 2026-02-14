@@ -24,6 +24,7 @@ export interface IStorage {
   getProfile(userId: string): Promise<UserProfile | undefined>;
   ensureProfile(userId: string): Promise<UserProfile>;
   updateProfileCredits(userId: string, credits: number): Promise<void>;
+  updateProfileRole(userId: string, role: string): Promise<void>;
   updateProfileStripeCustomerId(userId: string, stripeCustomerId: string): Promise<void>;
   updateProfileSubscription(userId: string, plan: string, subscriptionPlan: string): Promise<void>;
   incrementTotalAudits(userId: string): Promise<void>;
@@ -36,6 +37,9 @@ export interface IStorage {
   getAuditPages(auditId: number): Promise<AuditPage[]>;
   createCreditTransaction(tx: InsertCreditTransaction): Promise<CreditTransaction>;
   getCreditHistory(userId: string): Promise<CreditTransaction[]>;
+  getAllUsers(): Promise<User[]>;
+  getAllProfiles(): Promise<UserProfile[]>;
+  getAllAudits(): Promise<SeoAudit[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -77,6 +81,10 @@ export class DatabaseStorage implements IStorage {
 
   async updateProfileCredits(userId: string, credits: number): Promise<void> {
     await db.update(userProfiles).set({ credits }).where(eq(userProfiles.userId, userId));
+  }
+
+  async updateProfileRole(userId: string, role: string): Promise<void> {
+    await db.update(userProfiles).set({ role }).where(eq(userProfiles.userId, userId));
   }
 
   async updateProfileStripeCustomerId(userId: string, stripeCustomerId: string): Promise<void> {
@@ -142,6 +150,18 @@ export class DatabaseStorage implements IStorage {
       .from(creditTransactions)
       .where(eq(creditTransactions.userId, userId))
       .orderBy(desc(creditTransactions.createdAt));
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return db.select().from(users).orderBy(desc(users.createdAt));
+  }
+
+  async getAllProfiles(): Promise<UserProfile[]> {
+    return db.select().from(userProfiles);
+  }
+
+  async getAllAudits(): Promise<SeoAudit[]> {
+    return db.select().from(seoAudits).orderBy(desc(seoAudits.createdAt));
   }
 }
 

@@ -185,28 +185,28 @@ export default function LandingPage() {
           <p className="text-muted-foreground mb-12">Start free, scale as you grow</p>
           <div className="grid md:grid-cols-3 gap-6 max-w-3xl mx-auto">
             <PricingCard
-              title="Free"
-              price="$0"
-              credits="10 credits"
-              features={["10 free audits", "Basic AI analysis", "Score breakdown"]}
+              title="Starter"
+              price="$9"
+              credits="5 audits/month"
+              features={["5 audits per month", "AI-powered analysis", "Score breakdown", "JSON report export"]}
               cta="Get Started"
               variant="outline"
             />
             <PricingCard
               title="Pro"
-              price="$19"
-              credits="100 credits/mo"
-              features={["100 audits/month", "Advanced AI insights", "Priority processing", "Export reports"]}
+              price="$29"
+              credits="20 audits/month"
+              features={["20 audits per month", "Advanced AI fixes", "Priority processing", "Full page-level data", "JSON report export"]}
               cta="Upgrade to Pro"
               variant="default"
               highlighted
             />
             <PricingCard
-              title="Team"
-              price="$49"
-              credits="500 credits/mo"
-              features={["500 audits/month", "Team collaboration", "API access", "Custom branding"]}
-              cta="Contact Sales"
+              title="Agency"
+              price="$79"
+              credits="100 audits/month"
+              features={["100 audits per month", "All Pro features", "Bulk analysis", "API access", "Priority support"]}
+              cta="Go Agency"
               variant="outline"
             />
           </div>

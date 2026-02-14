@@ -16,6 +16,12 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
+  AlertTriangle,
+  XCircle,
+  Info,
+  TrendingUp,
+  Zap,
+  Download,
 } from "lucide-react";
 import type { SeoAudit, UserProfile } from "@shared/schema";
 
@@ -31,15 +37,23 @@ export default function DashboardPage() {
   });
 
   const recentAudits = audits?.slice(0, 5) ?? [];
-  const completedCount = audits?.filter((a) => a.status === "completed").length ?? 0;
-  const avgScore = audits?.length
+  const completedAudits = audits?.filter((a) => a.status === "completed") ?? [];
+  const completedCount = completedAudits.length;
+  const avgScore = completedAudits.length
     ? Math.round(
-        audits
-          .filter((a) => a.overallScore)
-          .reduce((sum, a) => sum + (a.overallScore ?? 0), 0) /
-          Math.max(audits.filter((a) => a.overallScore).length, 1)
+        completedAudits.reduce((sum, a) => sum + (a.overallScore ?? 0), 0) /
+          completedAudits.length
       )
     : 0;
+
+  const allIssues = completedAudits.flatMap((a) => {
+    const r = a.results as any;
+    return r?.issues ?? [];
+  });
+  const criticalCount = allIssues.filter((i: any) => i.severity === "critical").length;
+  const warningCount = allIssues.filter((i: any) => i.severity === "warning").length;
+  const infoCount = allIssues.filter((i: any) => i.severity === "info").length;
+  const totalIssues = allIssues.length;
 
   return (
     <div className="space-y-8">
@@ -86,6 +100,91 @@ export default function DashboardPage() {
         />
       </div>
 
+      {completedAudits.length > 0 && (
+        <div className="grid lg:grid-cols-2 gap-6">
+          <Card>
+            <CardContent className="p-6">
+              <h2 className="font-semibold mb-4 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-primary" />
+                SEO Health Score
+              </h2>
+              <div className="flex items-center gap-6">
+                <div className="relative w-28 h-28 shrink-0">
+                  <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                    <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="8" className="text-muted" />
+                    <circle
+                      cx="50" cy="50" r="42" fill="none"
+                      strokeWidth="8"
+                      strokeLinecap="round"
+                      strokeDasharray={`${avgScore * 2.64} ${264 - avgScore * 2.64}`}
+                      className={avgScore >= 80 ? "text-emerald-500" : avgScore >= 60 ? "text-amber-500" : "text-red-500"}
+                      stroke="currentColor"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className={`text-2xl font-bold ${getScoreColor(avgScore)}`} data-testid="text-health-score">
+                      {avgScore}
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-2 flex-1 min-w-0">
+                  <ScoreRow label="Meta Tags" value={getAvgCategoryScore(completedAudits, "metaScore")} />
+                  <ScoreRow label="Content" value={getAvgCategoryScore(completedAudits, "contentScore")} />
+                  <ScoreRow label="Performance" value={getAvgCategoryScore(completedAudits, "performanceScore")} />
+                  <ScoreRow label="Technical" value={getAvgCategoryScore(completedAudits, "technicalScore")} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <h2 className="font-semibold mb-4 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-primary" />
+                Issues by Severity
+              </h2>
+              {totalIssues === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">No issues found</p>
+              ) : (
+                <div className="space-y-4">
+                  <SeverityBar label="Critical" count={criticalCount} total={totalIssues} colorClass="bg-red-500 dark:bg-red-400" icon={<XCircle className="w-4 h-4 text-red-600 dark:text-red-400" />} />
+                  <SeverityBar label="Warning" count={warningCount} total={totalIssues} colorClass="bg-amber-500 dark:bg-amber-400" icon={<AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />} />
+                  <SeverityBar label="Info" count={infoCount} total={totalIssues} colorClass="bg-blue-500 dark:bg-blue-400" icon={<Info className="w-4 h-4 text-blue-600 dark:text-blue-400" />} />
+                  <p className="text-xs text-muted-foreground text-right">{totalIssues} total issues across {completedCount} audits</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {completedAudits.length > 0 && (
+        <Card>
+          <CardContent className="p-6">
+            <h2 className="font-semibold mb-4 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-primary" />
+              Top Fix Suggestions
+            </h2>
+            <div className="space-y-3">
+              {getTopFixes(completedAudits).map((fix, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <div className={`mt-0.5 shrink-0 ${fix.severity === "critical" ? "text-red-600 dark:text-red-400" : fix.severity === "warning" ? "text-amber-600 dark:text-amber-400" : "text-blue-600 dark:text-blue-400"}`}>
+                    {fix.severity === "critical" ? <XCircle className="w-4 h-4" /> : fix.severity === "warning" ? <AlertTriangle className="w-4 h-4" /> : <Info className="w-4 h-4" />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{fix.title}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{fix.recommendedFix || fix.description}</p>
+                  </div>
+                </div>
+              ))}
+              {getTopFixes(completedAudits).length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">No fix suggestions available</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div>
         <div className="flex items-center justify-between gap-4 mb-4">
           <h2 className="text-lg font-semibold">Recent Audits</h2>
@@ -130,6 +229,72 @@ export default function DashboardPage() {
   );
 }
 
+function getAvgCategoryScore(audits: SeoAudit[], field: keyof SeoAudit): number {
+  const scores = audits.map((a) => (a as any)[field]).filter((s: any) => s != null) as number[];
+  return scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+}
+
+function getTopFixes(audits: SeoAudit[]): any[] {
+  const allIssues: any[] = [];
+  for (const audit of audits) {
+    const r = audit.results as any;
+    if (r?.issues) {
+      for (const issue of r.issues) {
+        allIssues.push(issue);
+      }
+    }
+  }
+  const seen = new Set<string>();
+  const unique: any[] = [];
+  for (const issue of allIssues) {
+    const key = issue.title || issue.issueType;
+    if (!seen.has(key)) {
+      seen.add(key);
+      unique.push(issue);
+    }
+  }
+  unique.sort((a, b) => {
+    const order: Record<string, number> = { critical: 0, warning: 1, info: 2 };
+    return (order[a.severity] ?? 3) - (order[b.severity] ?? 3);
+  });
+  return unique.slice(0, 6);
+}
+
+function ScoreRow({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-medium">{label}</span>
+        <span className={`text-xs font-mono font-semibold ${getScoreColor(value)}`}>{value}</span>
+      </div>
+      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${value >= 80 ? "bg-emerald-500 dark:bg-emerald-400" : value >= 60 ? "bg-amber-500 dark:bg-amber-400" : "bg-red-500 dark:bg-red-400"}`}
+          style={{ width: `${value}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SeverityBar({ label, count, total, colorClass, icon }: { label: string; count: number; total: number; colorClass: string; icon: React.ReactNode }) {
+  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          {icon}
+          <span className="text-sm font-medium">{label}</span>
+        </div>
+        <span className="text-sm font-mono">{count}</span>
+      </div>
+      <div className="h-2 bg-muted rounded-full overflow-hidden">
+        <div className={`h-full rounded-full ${colorClass}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
 function StatCard({
   icon,
   label,
@@ -168,8 +333,8 @@ function AuditListItem({ audit }: { audit: SeoAudit }) {
   const status = statusConfig[audit.status as keyof typeof statusConfig] ?? statusConfig.pending;
 
   return (
-    <Link href={audit.status === "completed" ? `/audits/${audit.id}` : "#"}>
-      <Card className={audit.status === "completed" ? "hover-elevate cursor-pointer" : ""}>
+    <Link href={`/audits/${audit.id}`}>
+      <Card className="hover-elevate cursor-pointer">
         <CardContent className="p-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">

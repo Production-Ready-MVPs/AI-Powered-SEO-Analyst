@@ -1,6 +1,8 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { useQuery } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import {
   Sidebar,
   SidebarContent,
@@ -12,7 +14,8 @@ import {
   SidebarFooter,
   SidebarHeader,
 } from "@/components/ui/sidebar";
-import { Search, LayoutDashboard, FileText, Plus, Settings } from "lucide-react";
+import { Search, LayoutDashboard, FileText, Plus, Settings, Shield, Coins } from "lucide-react";
+import type { UserProfile } from "@shared/schema";
 
 const menuItems = [
   { title: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -24,6 +27,12 @@ const menuItems = [
 export function AppSidebar() {
   const [location] = useLocation();
   const { user } = useAuth();
+
+  const { data: profile } = useQuery<UserProfile>({
+    queryKey: ["/api/profile"],
+  });
+
+  const isAdmin = profile?.role === "admin";
 
   return (
     <Sidebar>
@@ -59,11 +68,32 @@ export function AppSidebar() {
                   </SidebarMenuItem>
                 );
               })}
+              {isAdmin && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location.startsWith("/admin")}
+                    data-testid="sidebar-admin"
+                  >
+                    <Link href="/admin">
+                      <Shield className="w-4 h-4" />
+                      <span>Admin</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="p-4">
+      <SidebarFooter className="p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <Coins className="w-4 h-4 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">Credits:</span>
+          <Badge variant="secondary" className="text-xs" data-testid="sidebar-credits">
+            {profile?.credits ?? 0}
+          </Badge>
+        </div>
         <div className="flex items-center gap-2 min-w-0">
           <Avatar className="w-7 h-7">
             <AvatarImage src={user?.profileImageUrl ?? undefined} />

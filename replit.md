@@ -13,11 +13,11 @@ DevSEO AI is a SaaS platform that provides AI-powered SEO audits. Users can subm
 
 ## Architecture
 - `client/src/` - React frontend
-  - `pages/` - Landing, Dashboard, NewAudit, AuditDetail, AuditsList, Settings
+  - `pages/` - Landing, Dashboard, NewAudit, AuditDetail, AuditsList, Settings, Admin
   - `components/` - AppSidebar, ThemeProvider, ThemeToggle, shadcn/ui components
   - `hooks/` - useAuth, useToast, useMobile
 - `server/` - Express backend
-  - `routes.ts` - API endpoints
+  - `routes.ts` - API endpoints (user + admin routes, rate limiting, suspended user blocking)
   - `storage.ts` - Database operations (IStorage / DatabaseStorage)
   - `seo-analyzer.ts` - Legacy SEO analysis (kept for extractDomain utility)
   - `lib/crawler.ts` - Playwright crawler service (max 20 pages, robots.txt, retry logic)
@@ -36,10 +36,16 @@ DevSEO AI is a SaaS platform that provides AI-powered SEO audits. Users can subm
 ## Key Features
 - Multi-tenant: Each user sees only their own audits
 - Credit system: Users start with 10 free credits, each audit costs 1
-- Role-based: User profiles have role and plan fields
+- Role-based: User profiles have role and plan fields; admin role gets admin panel access
+- Suspended users: Admin can suspend users, blocked from API access via middleware
 - AI Analysis: OpenAI analyzes URLs for SEO issues and provides scores + recommendations
 - Background processing: Audits run asynchronously after creation
 - Auto-refresh: Audit detail page polls while pending/processing
+- Dashboard analytics: SEO health score ring chart, issues by severity, top fix suggestions, category score progress bars
+- Audit detail: Live progress tracking (queued→crawling→analyzing→fixing→saving), tabbed interface (issues/AI fixes/pages/details), copy-to-clipboard for AI fixes, JSON report download
+- Admin panel: User management (view all, suspend/unsuspend), audit viewing, credit adjustment, usage statistics
+- Rate limiting: In-memory rate limiter on audit creation (10 per minute per user)
+- Landing page pricing: Starter ($9, 5 audits), Pro ($29, 20 audits), Agency ($79, 100 audits)
 
 ## Database Tables
 - `users` - Auth users (managed by Replit Auth): id, email, firstName, lastName, profileImageUrl, createdAt, updatedAt
@@ -51,15 +57,20 @@ DevSEO AI is a SaaS platform that provides AI-powered SEO audits. Users can subm
 
 ## API Routes
 - `GET /api/profile` - Current user profile (auto-creates with 10 credits)
-- `GET /api/audits` - List user's audits
-- `GET /api/audits/:id` - Single audit
+- `GET /api/audits` - List user's audits (suspended check)
+- `GET /api/audits/:id` - Single audit (suspended check)
 - `GET /api/audits/:id/pages` - Page-level data for an audit
 - `GET /api/audits/:id/progress` - Real-time job progress (stage, message, percent)
-- `POST /api/audits` - Create new audit (costs 1 credit, extracts domain)
+- `POST /api/audits` - Create new audit (costs 1 credit, rate limited, suspended check)
 - `GET /api/credits/history` - Credit transaction history
 - `GET /api/auth/user` - Current auth user
 - `GET /api/login` - Start login flow
 - `GET /api/logout` - Logout
+- `GET /api/admin/stats` - Admin stats (total users, audits, avg score, credits used)
+- `GET /api/admin/users` - All users with profiles (admin only)
+- `GET /api/admin/audits` - All audits (admin only)
+- `POST /api/admin/credits` - Adjust user credits (admin only)
+- `POST /api/admin/suspend` - Suspend/unsuspend user (admin only)
 
 ## Running
 - `npm run dev` starts both frontend and backend on port 5000
