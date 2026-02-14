@@ -5,6 +5,19 @@ const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
+interface PageData {
+  url: string;
+  title: string;
+  metaDescription: string;
+  headings: { h1: string[]; h2: string[]; h3: string[] };
+  wordCount: number;
+  internalLinks: number;
+  externalLinks: number;
+  images: number;
+  schemaDetected: string[];
+  issues: Array<{ severity: string; title: string; description: string }>;
+}
+
 interface SeoAnalysisResult {
   overallScore: number;
   metaScore: number;
@@ -12,6 +25,9 @@ interface SeoAnalysisResult {
   performanceScore: number;
   technicalScore: number;
   summary: string;
+  issuesFound: number;
+  fixesGenerated: number;
+  pages: PageData[];
   results: {
     issues: Array<{
       severity: "critical" | "warning" | "info";
@@ -26,6 +42,15 @@ interface SeoAnalysisResult {
       technical: Record<string, any>;
     };
   };
+}
+
+export function extractDomain(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname;
+  } catch {
+    return url;
+  }
 }
 
 export async function analyzeSeo(url: string): Promise<SeoAnalysisResult> {
@@ -48,6 +73,22 @@ Return a JSON object with this exact structure:
   "performanceScore": <number 0-100>,
   "technicalScore": <number 0-100>,
   "summary": "<2-3 sentence summary of the overall SEO health>",
+  "pages": [
+    {
+      "url": "${url}",
+      "title": "<detected or expected page title>",
+      "metaDescription": "<detected or expected meta description>",
+      "headings": { "h1": ["<h1 texts>"], "h2": ["<h2 texts>"], "h3": ["<h3 texts>"] },
+      "wordCount": <estimated word count>,
+      "internalLinks": <estimated count>,
+      "externalLinks": <estimated count>,
+      "images": <estimated count>,
+      "schemaDetected": ["<schema types detected, e.g. Organization, WebPage>"],
+      "issues": [
+        { "severity": "critical|warning|info", "title": "<issue>", "description": "<description>" }
+      ]
+    }
+  ],
   "results": {
     "issues": [
       {
@@ -84,7 +125,7 @@ Return a JSON object with this exact structure:
   }
 }
 
-Provide realistic, detailed analysis with at least 3-5 issues and 4-6 recommendations. Be specific and actionable. Return ONLY valid JSON.`;
+Provide realistic, detailed analysis with at least 3-5 issues and 4-6 recommendations. Include at least 1 page in the pages array. Be specific and actionable. Return ONLY valid JSON.`;
 
   const response = await openai.chat.completions.create({
     model: "gpt-5-mini",
@@ -101,6 +142,10 @@ Provide realistic, detailed analysis with at least 3-5 issues and 4-6 recommenda
   parsed.contentScore = Math.min(100, Math.max(0, Math.round(parsed.contentScore ?? 50)));
   parsed.performanceScore = Math.min(100, Math.max(0, Math.round(parsed.performanceScore ?? 50)));
   parsed.technicalScore = Math.min(100, Math.max(0, Math.round(parsed.technicalScore ?? 50)));
+
+  parsed.pages = parsed.pages ?? [];
+  parsed.issuesFound = parsed.results?.issues?.length ?? 0;
+  parsed.fixesGenerated = parsed.results?.recommendations?.length ?? 0;
 
   return parsed;
 }

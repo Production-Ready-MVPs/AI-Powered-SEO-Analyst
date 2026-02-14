@@ -5,6 +5,9 @@ import {
   seoAudits,
   type SeoAudit,
   type InsertSeoAudit,
+  auditPages,
+  type AuditPage,
+  type InsertAuditPage,
   creditTransactions,
   type CreditTransaction,
   type InsertCreditTransaction,
@@ -21,11 +24,16 @@ export interface IStorage {
   getProfile(userId: string): Promise<UserProfile | undefined>;
   ensureProfile(userId: string): Promise<UserProfile>;
   updateProfileCredits(userId: string, credits: number): Promise<void>;
+  updateProfileStripeCustomerId(userId: string, stripeCustomerId: string): Promise<void>;
+  updateProfileSubscription(userId: string, plan: string, subscriptionPlan: string): Promise<void>;
   incrementTotalAudits(userId: string): Promise<void>;
   createAudit(audit: InsertSeoAudit): Promise<SeoAudit>;
   getAudit(id: number): Promise<SeoAudit | undefined>;
   getAuditsByUser(userId: string): Promise<SeoAudit[]>;
   updateAudit(id: number, data: Partial<SeoAudit>): Promise<SeoAudit | undefined>;
+  createAuditPage(page: InsertAuditPage): Promise<AuditPage>;
+  createAuditPages(pages: InsertAuditPage[]): Promise<AuditPage[]>;
+  getAuditPages(auditId: number): Promise<AuditPage[]>;
   createCreditTransaction(tx: InsertCreditTransaction): Promise<CreditTransaction>;
   getCreditHistory(userId: string): Promise<CreditTransaction[]>;
 }
@@ -58,7 +66,7 @@ export class DatabaseStorage implements IStorage {
     if (existing) return existing;
     const [profile] = await db
       .insert(userProfiles)
-      .values({ userId, credits: 10, role: "user", plan: "free", totalAudits: 0 })
+      .values({ userId, credits: 10, role: "user", plan: "free", subscriptionPlan: "free", totalAudits: 0 })
       .onConflictDoUpdate({
         target: userProfiles.userId,
         set: { userId },
@@ -69,6 +77,14 @@ export class DatabaseStorage implements IStorage {
 
   async updateProfileCredits(userId: string, credits: number): Promise<void> {
     await db.update(userProfiles).set({ credits }).where(eq(userProfiles.userId, userId));
+  }
+
+  async updateProfileStripeCustomerId(userId: string, stripeCustomerId: string): Promise<void> {
+    await db.update(userProfiles).set({ stripeCustomerId }).where(eq(userProfiles.userId, userId));
+  }
+
+  async updateProfileSubscription(userId: string, plan: string, subscriptionPlan: string): Promise<void> {
+    await db.update(userProfiles).set({ plan, subscriptionPlan }).where(eq(userProfiles.userId, userId));
   }
 
   async incrementTotalAudits(userId: string): Promise<void> {
@@ -98,6 +114,21 @@ export class DatabaseStorage implements IStorage {
   async updateAudit(id: number, data: Partial<SeoAudit>): Promise<SeoAudit | undefined> {
     const [updated] = await db.update(seoAudits).set(data).where(eq(seoAudits.id, id)).returning();
     return updated;
+  }
+
+  async createAuditPage(page: InsertAuditPage): Promise<AuditPage> {
+    const [created] = await db.insert(auditPages).values(page).returning();
+    return created;
+  }
+
+  async createAuditPages(pages: InsertAuditPage[]): Promise<AuditPage[]> {
+    if (pages.length === 0) return [];
+    const created = await db.insert(auditPages).values(pages).returning();
+    return created;
+  }
+
+  async getAuditPages(auditId: number): Promise<AuditPage[]> {
+    return db.select().from(auditPages).where(eq(auditPages.auditId, auditId));
   }
 
   async createCreditTransaction(tx: InsertCreditTransaction): Promise<CreditTransaction> {

@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
-import { analyzeSeo } from "./seo-analyzer";
+import { analyzeSeo, extractDomain } from "./seo-analyzer";
 import { z } from "zod";
 
 export async function registerRoutes(
@@ -49,6 +49,22 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/audits/:id/pages", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const audit = await storage.getAudit(id);
+      if (!audit || audit.userId !== userId) {
+        return res.status(404).json({ message: "Audit not found" });
+      }
+      const pages = await storage.getAuditPages(id);
+      res.json(pages);
+    } catch (error) {
+      console.error("Error fetching audit pages:", error);
+      res.status(500).json({ message: "Failed to fetch audit pages" });
+    }
+  });
+
   app.post("/api/audits", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -60,8 +76,9 @@ export async function registerRoutes(
 
       const schema = z.object({ url: z.string().url() });
       const { url } = schema.parse(req.body);
+      const domain = extractDomain(url);
 
-      const audit = await storage.createAudit({ userId, url });
+      const audit = await storage.createAudit({ userId, url, domain });
 
       await storage.updateProfileCredits(userId, profile.credits - 1);
       await storage.createCreditTransaction({
@@ -78,6 +95,24 @@ export async function registerRoutes(
         try {
           await storage.updateAudit(audit.id, { status: "processing" });
           const result = await analyzeSeo(url);
+
+          if (result.pages && result.pages.length > 0) {
+            const pageRecords = result.pages.map((page) => ({
+              auditId: audit.id,
+              url: page.url,
+              title: page.title ?? null,
+              metaDescription: page.metaDescription ?? null,
+              headings: page.headings ?? null,
+              wordCount: page.wordCount ?? 0,
+              internalLinks: page.internalLinks ?? 0,
+              externalLinks: page.externalLinks ?? 0,
+              images: page.images ?? 0,
+              schemaDetected: page.schemaDetected ?? null,
+              issues: page.issues ?? null,
+            }));
+            await storage.createAuditPages(pageRecords);
+          }
+
           await storage.updateAudit(audit.id, {
             status: "completed",
             overallScore: result.overallScore,
@@ -85,6 +120,9 @@ export async function registerRoutes(
             contentScore: result.contentScore,
             performanceScore: result.performanceScore,
             technicalScore: result.technicalScore,
+            pagesCrawled: result.pages?.length ?? 1,
+            issuesFound: result.issuesFound,
+            fixesGenerated: result.fixesGenerated,
             summary: result.summary,
             results: result.results,
             completedAt: new Date(),
