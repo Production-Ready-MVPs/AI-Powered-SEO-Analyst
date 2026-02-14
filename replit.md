@@ -37,17 +37,19 @@ DevSEO AI is a SaaS platform that provides AI-powered SEO audits. Users can subm
 - Auto-refresh: Audit detail page polls while pending/processing
 
 ## Database Tables
-- `users` - Auth users (managed by Replit Auth)
-- `sessions` - Session storage
-- `user_profiles` - Credits, role, plan
-- `seo_audits` - URL, scores, results (JSONB), status
-- `credit_transactions` - Credit history
+- `users` - Auth users (managed by Replit Auth): id, email, firstName, lastName, profileImageUrl, createdAt, updatedAt
+- `sessions` - Session storage: sid, sess (JSONB), expire
+- `user_profiles` - User profile data: userId (FK→users, unique), credits, role, plan, subscriptionPlan, stripeCustomerId, totalAudits, createdAt. Indexes: userId, stripeCustomerId
+- `seo_audits` - Audit records: userId (FK→users), url, domain, status, overallScore, metaScore, contentScore, performanceScore, technicalScore, pagesCrawled, issuesFound, fixesGenerated, results (JSONB), summary, createdAt, completedAt. Indexes: userId, status, domain, createdAt
+- `audit_pages` - Page-level SEO data: auditId (FK→seo_audits, cascade delete), url, title, metaDescription, headings (JSONB), wordCount, internalLinks, externalLinks, images, schemaDetected (JSONB), issues (JSONB), createdAt. Indexes: auditId, url
+- `credit_transactions` - Credit history: userId (FK→users), amount, type, description, auditId, createdAt. Indexes: userId, auditId
 
 ## API Routes
-- `GET /api/profile` - Current user profile (auto-creates)
+- `GET /api/profile` - Current user profile (auto-creates with 10 credits)
 - `GET /api/audits` - List user's audits
 - `GET /api/audits/:id` - Single audit
-- `POST /api/audits` - Create new audit (costs 1 credit)
+- `GET /api/audits/:id/pages` - Page-level data for an audit
+- `POST /api/audits` - Create new audit (costs 1 credit, extracts domain)
 - `GET /api/credits/history` - Credit transaction history
 - `GET /api/auth/user` - Current auth user
 - `GET /api/login` - Start login flow
