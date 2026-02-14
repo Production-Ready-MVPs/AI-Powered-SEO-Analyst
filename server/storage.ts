@@ -1,38 +1,117 @@
-import { type User, type InsertUser } from "@shared/schema";
-import { randomUUID } from "crypto";
-
-// modify the interface with any CRUD methods
-// you might need
+import {
+  users,
+  type User,
+  type UpsertUser,
+  seoAudits,
+  type SeoAudit,
+  type InsertSeoAudit,
+  creditTransactions,
+  type CreditTransaction,
+  type InsertCreditTransaction,
+  userProfiles,
+  type UserProfile,
+  type InsertUserProfile,
+} from "@shared/schema";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  upsertUser(user: UpsertUser): Promise<User>;
+  getProfile(userId: string): Promise<UserProfile | undefined>;
+  ensureProfile(userId: string): Promise<UserProfile>;
+  updateProfileCredits(userId: string, credits: number): Promise<void>;
+  incrementTotalAudits(userId: string): Promise<void>;
+  createAudit(audit: InsertSeoAudit): Promise<SeoAudit>;
+  getAudit(id: number): Promise<SeoAudit | undefined>;
+  getAuditsByUser(userId: string): Promise<SeoAudit[]>;
+  updateAudit(id: number, data: Partial<SeoAudit>): Promise<SeoAudit | undefined>;
+  createCreditTransaction(tx: InsertCreditTransaction): Promise<CreditTransaction>;
+  getCreditHistory(userId: string): Promise<CreditTransaction[]>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-
-  constructor() {
-    this.users = new Map();
-  }
-
+export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
   }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(userData)
+      .onConflictDoUpdate({
+        target: users.id,
+        set: { ...userData, updatedAt: new Date() },
+      })
+      .returning();
+    return user;
+  }
+
+  async getProfile(userId: string): Promise<UserProfile | undefined> {
+    const [profile] = await db.select().from(userProfiles).where(eq(userProfiles.userId, userId));
+    return profile;
+  }
+
+  async ensureProfile(userId: string): Promise<UserProfile> {
+    const existing = await this.getProfile(userId);
+    if (existing) return existing;
+    const [profile] = await db
+      .insert(userProfiles)
+      .values({ userId, credits: 10, role: "user", plan: "free", totalAudits: 0 })
+      .onConflictDoUpdate({
+        target: userProfiles.userId,
+        set: { userId },
+      })
+      .returning();
+    return profile;
+  }
+
+  async updateProfileCredits(userId: string, credits: number): Promise<void> {
+    await db.update(userProfiles).set({ credits }).where(eq(userProfiles.userId, userId));
+  }
+
+  async incrementTotalAudits(userId: string): Promise<void> {
+    const profile = await this.getProfile(userId);
+    if (profile) {
+      await db
+        .update(userProfiles)
+        .set({ totalAudits: profile.totalAudits + 1 })
+        .where(eq(userProfiles.userId, userId));
+    }
+  }
+
+  async createAudit(audit: InsertSeoAudit): Promise<SeoAudit> {
+    const [created] = await db.insert(seoAudits).values(audit).returning();
+    return created;
+  }
+
+  async getAudit(id: number): Promise<SeoAudit | undefined> {
+    const [audit] = await db.select().from(seoAudits).where(eq(seoAudits.id, id));
+    return audit;
+  }
+
+  async getAuditsByUser(userId: string): Promise<SeoAudit[]> {
+    return db.select().from(seoAudits).where(eq(seoAudits.userId, userId)).orderBy(desc(seoAudits.createdAt));
+  }
+
+  async updateAudit(id: number, data: Partial<SeoAudit>): Promise<SeoAudit | undefined> {
+    const [updated] = await db.update(seoAudits).set(data).where(eq(seoAudits.id, id)).returning();
+    return updated;
+  }
+
+  async createCreditTransaction(tx: InsertCreditTransaction): Promise<CreditTransaction> {
+    const [created] = await db.insert(creditTransactions).values(tx).returning();
+    return created;
+  }
+
+  async getCreditHistory(userId: string): Promise<CreditTransaction[]> {
+    return db
+      .select()
+      .from(creditTransactions)
+      .where(eq(creditTransactions.userId, userId))
+      .orderBy(desc(creditTransactions.createdAt));
+  }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
